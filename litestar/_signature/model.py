@@ -61,6 +61,7 @@ class ErrorMessage(TypedDict):
     key: NotRequired[str]
     message: str
     source: NotRequired[Literal["body"] | ParamType]
+    exc: NotRequired[Dict[str, Any]]
 
 
 MSGSPEC_CONSTRAINT_FIELDS = (
@@ -128,12 +129,15 @@ class SignatureModel(Struct):
         return InternalServerException()
 
     @classmethod
-    def _build_error_message(cls, keys: Sequence[str], exc_msg: str, connection: ASGIConnection) -> ErrorMessage:
+    def _build_error_message(
+        cls, keys: Sequence[str], exc_msg: str, connection: ASGIConnection, exc: Optional[Dict[str, Any]] = None
+    ) -> ErrorMessage:
         """Build an error message.
 
         Args:
             keys: A list of keys.
             exc_msg: A message.
+            exc: An optional error dict.
             connection: An ASGI connection instance.
 
         Returns:
@@ -141,6 +145,9 @@ class SignatureModel(Struct):
         """
 
         message: ErrorMessage = {"message": exc_msg.split(" - ")[0]}
+
+        if exc:
+            message["exc"] = exc
 
         if keys:
             message["key"] = key = ".".join(keys)
@@ -195,7 +202,7 @@ class SignatureModel(Struct):
         except ExtendedMsgSpecValidationError as e:
             for exc in e.errors:
                 keys = [str(loc) for loc in exc["loc"]]
-                message = cls._build_error_message(keys=keys, exc_msg=exc["msg"], connection=connection)
+                message = cls._build_error_message(keys=keys, exc_msg=exc["msg"], connection=connection, exc=exc)
                 messages.append(message)
             raise cls._create_exception(messages=messages, connection=connection) from e
         except ValidationError as e:

@@ -177,25 +177,80 @@ def test_signature_model_invalid_input(base_model: BaseModelType, pydantic_versi
         assert data
         if pydantic_version == "v1":
             assert data["extra"] == [
-                {"key": "child.val", "message": "value is not a valid integer"},
-                {"key": "child.other_val", "message": "value is not a valid integer"},
-                {"key": "other_child.val.1", "message": "value is not a valid integer"},
+                {
+                    "key": "child.val",
+                    "message": "value is not a valid integer",
+                    "exc": {
+                        "loc": ["child", "val"],
+                        "msg": "value is not a valid integer",
+                        "type": "type_error.integer",
+                    },
+                },
+                {
+                    "key": "child.other_val",
+                    "message": "value is not a valid integer",
+                    "exc": {
+                        "loc": ["child", "other_val"],
+                        "msg": "value is not a valid integer",
+                        "type": "type_error.integer",
+                    },
+                },
+                {
+                    "key": "other_child.val.1",
+                    "message": "value is not a valid integer",
+                    "exc": {
+                        "loc": ["other_child", "val", 1],
+                        "msg": "value is not a valid integer",
+                        "type": "type_error.integer",
+                    },
+                },
             ]
         else:
-            assert data["extra"] == [
+            # removed url from exc as that contains pydantic version specific url
+            expected_extra_dict: List[Dict[str, Any]] = [
                 {
-                    "message": "Input should be a valid integer, unable to parse string as an integer",
                     "key": "child.val",
+                    "message": "Input should be a valid integer, unable to parse string as an integer",
+                    "exc": {
+                        "type": "int_parsing",
+                        "loc": ["child", "val"],
+                        "msg": "Input should be a valid integer, unable to parse string as an integer",
+                        "input": "a",
+                    },
                 },
                 {
-                    "message": "Input should be a valid integer, unable to parse string as an integer",
                     "key": "child.other_val",
+                    "message": "Input should be a valid integer, unable to parse string as an integer",
+                    "exc": {
+                        "type": "int_parsing",
+                        "loc": ["child", "other_val"],
+                        "msg": "Input should be a valid integer, unable to parse string as an integer",
+                        "input": "b",
+                    },
                 },
                 {
-                    "message": "Input should be a valid integer, unable to parse string as an integer",
                     "key": "other_child.val.1",
+                    "message": "Input should be a valid integer, unable to parse string as an integer",
+                    "exc": {
+                        "type": "int_parsing",
+                        "loc": ["other_child", "val", 1],
+                        "msg": "Input should be a valid integer, unable to parse string as an integer",
+                        "input": "c",
+                    },
                 },
             ]
+            for data_extra_item, expected_extra_item in zip(data["extra"], expected_extra_dict):
+                # partial assert for key and message
+                assert all(
+                    data_extra_item[key] == expected_extra_item[key]
+                    for key in list(set(data_extra_item.keys()) - {"exc"})
+                )
+
+                # partial assert for exc without url
+                assert all(
+                    data_extra_item["exc"][key] == expected_extra_item["exc"][key]
+                    for key in list(set(data_extra_item["exc"].keys()) - {"url"})
+                )
 
 
 class V1ModelWithPrivateFields(pydantic_v1.BaseModel):
